@@ -1,13 +1,17 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { CartLine } from "@/types";
+import { formatPrice } from "@/types";
 
 type CartState = {
   lines: CartLine[];
   addItem: (line: CartLine) => void;
-  removeItem: (productId: string) => void;
-  setQuantity: (productId: string, quantity: number) => void;
+  removeItem: (id: string) => void;
+  setQuantity: (id: string, quantity: number) => void;
   clear: () => void;
+  totalAmount: () => number;
+  currencyCode: () => string;
+  formattedTotal: () => string;
   totalKobo: () => number;
   totalItems: () => number;
 };
@@ -19,47 +23,76 @@ export const useCartStore = create<CartState>()(
 
       addItem: (line) => {
         set((state) => {
-          const existing = state.lines.find((l) => l.productId === line.productId);
-          if (existing) {
-            const nextQty = Math.min(existing.quantity + line.quantity, existing.stock);
-            return {
-              lines: state.lines.map((l) =>
-                l.productId === line.productId ? { ...l, quantity: nextQty } : l
-              )
-            };
+          const matchKey = line.variantId || line.productId;
+          const existingIndex = state.lines.findIndex(
+            (l) => (l.variantId || l.productId) === matchKey
+          );
+
+          if (existingIndex > -1) {
+            const existing = state.lines[existingIndex];
+            const maxStock = existing.stock > 0 ? existing.stock : 99;
+            const nextQty = Math.min(existing.quantity + line.quantity, maxStock);
+            const updated = [...state.lines];
+            updated[existingIndex] = { ...existing, quantity: nextQty };
+            return { lines: updated };
           }
           return { lines: [...state.lines, line] };
         });
       },
 
-      removeItem: (productId) => {
-        set((state) => ({ lines: state.lines.filter((l) => l.productId !== productId) }));
+      removeItem: (id) => {
+        set((state) => ({
+          lines: state.lines.filter((l) => l.variantId !== id && l.productId !== id)
+        }));
       },
 
-      setQuantity: (productId, quantity) => {
+      setQuantity: (id, quantity) => {
         set((state) => ({
           lines: state.lines
-            .map((l) =>
-              l.productId === productId
-                ? { ...l, quantity: Math.max(1, Math.min(quantity, l.stock)) }
-                : l
-            )
+            .map((l) => {
+              if (l.variantId === id || l.productId === id) {
+                const maxStock = l.stock > 0 ? l.stock : 99;
+                return { ...l, quantity: Math.max(1, Math.min(quantity, maxStock)) };
+              }
+              return l;
+            })
             .filter((l) => l.quantity > 0)
         }));
       },
 
       clear: () => set({ lines: [] }),
 
-      totalKobo: () => get().lines.reduce((sum, l) => sum + l.priceKobo * l.quantity, 0),
+      totalAmount: () => {
+        return get().lines.reduce((sum, l) => {
+          const itemPrice =
+            typeof l.price === "number"
+              ? l.price
+              : l.priceKobo
+              ? l.priceKobo / 100
+              : 0;
+          return sum + itemPrice * l.quantity;
+        }, 0);
+      },
+
+      currencyCode: () => {
+        const first = get().lines[0];
+        return first?.currencyCode || "NGN";
+      },
+
+      formattedTotal: () => {
+        const total = get().totalAmount();
+        const code = get().currencyCode();
+        return formatPrice(total, code);
+      },
+
+      totalKobo: () => {
+        return Math.round(get().totalAmount() * 100);
+      },
 
       totalItems: () => get().lines.reduce((sum, l) => sum + l.quantity, 0)
     }),
     {
-      // Guest cart survives reloads via localStorage. This is a per-browser
-      // convenience only — the server always recomputes the real total
-      // from the database at checkout, so a tampered localStorage value
-      // can never change what the customer is actually charged.
-      name: "touch-and-glow-cart"
+      name: "touch-and-glow-shopify-cart"
     }
   )
 );

@@ -4,6 +4,7 @@ import cors from "cors";
 import { productsRouter } from "./routes/products";
 import { ordersRouter } from "./routes/orders";
 import { webhookRouter } from "./routes/paystack-webhook";
+import { shopifyRouter } from "./routes/shopify";
 
 const app = express();
 
@@ -13,15 +14,15 @@ app.use(
   })
 );
 
-// The Paystack webhook needs the RAW request body to verify its HMAC
-// signature, so it's mounted with express.raw() before the global
-// express.json() parser touches it. Every other route gets parsed JSON.
+// Raw request bodies needed for HMAC verification before express.json()
 app.use("/api/paystack/webhook", express.raw({ type: "application/json" }), webhookRouter);
+app.use("/api/shopify/webhooks", express.raw({ type: "application/json" }), shopifyRouter);
 
 app.use(express.json());
 
 app.use("/api/products", productsRouter);
 app.use("/api/orders", ordersRouter);
+app.use("/api/shopify", shopifyRouter);
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
 

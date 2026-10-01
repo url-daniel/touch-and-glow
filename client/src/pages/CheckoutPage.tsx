@@ -1,144 +1,192 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useCartStore } from "@/lib/cart-store";
-import { nairaFromKobo } from "@/types";
-import { apiFetch } from "@/lib/api";
+import { createShopifyCheckout, isShopifyConfigured } from "@/lib/shopify";
+import { formatPrice } from "@/types";
 
 export default function CheckoutPage() {
-  const { lines, setQuantity, removeItem, totalKobo } = useCartStore();
-  const [form, setForm] = useState({
-    customerName: "",
-    customerEmail: "",
-    customerPhone: "",
-    shippingAddress: ""
-  });
+  const { lines, setQuantity, removeItem, formattedTotal, totalAmount, currencyCode } = useCartStore();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleShopifyCheckout() {
     setError(null);
     setSubmitting(true);
 
     try {
-      const data = await apiFetch<{ authorizationUrl: string }>("/api/orders", {
-        method: "POST",
-        body: JSON.stringify({
-          ...form,
-          items: lines.map((l) => ({ productId: l.productId, quantity: l.quantity }))
-        })
-      });
+      if (!isShopifyConfigured()) {
+        throw new Error(
+          "Shopify Storefront API credentials are required to complete live checkout. Please add VITE_SHOPIFY_STORE_DOMAIN and VITE_SHOPIFY_STOREFRONT_ACCESS_TOKEN to your environment."
+        );
+      }
 
-      // Hand off to Paystack's hosted checkout. We don't clear the cart
-      // here — it clears once payment is confirmed, so an abandoned
-      // Paystack session doesn't lose the customer's cart.
-      window.location.href = data.authorizationUrl;
+      // Map lines for Shopify Storefront API cartCreate mutation
+      const checkoutItems = lines.map((l) => ({
+        variantId: l.variantId || l.productId,
+        quantity: l.quantity
+      }));
+
+      const { checkoutUrl } = await createShopifyCheckout(checkoutItems);
+
+      // Redirect directly to Shopify's secure hosted checkout
+      window.location.href = checkoutUrl;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setError(err instanceof Error ? err.message : "Something went wrong while generating checkout.");
       setSubmitting(false);
     }
   }
 
   if (lines.length === 0) {
     return (
-      <div className="mx-auto max-w-xl px-6 py-24 text-center">
-        <h1 className="font-display text-3xl italic text-espresso">Your cart is empty</h1>
-        <Link to="/#shop" className="mt-6 inline-block text-sm text-clay-dark underline">
-          Back to the collection
+      <div className="mx-auto max-w-xl px-6 py-28 text-center">
+        <h1 className="font-display text-3xl italic text-espresso">Your bag is empty</h1>
+        <p className="mt-3 text-taupe text-sm">Discover our skin-revitalizing botanical collection.</p>
+        <Link
+          to="/#shop"
+          className="mt-8 inline-block rounded-full bg-clay px-8 py-3 text-sm font-medium text-ivory transition-colors hover:bg-clay-dark"
+        >
+          Explore Collection
         </Link>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-6 py-14">
-      <h1 className="font-display text-3xl italic text-espresso">Checkout</h1>
-
-      <div className="mt-8 divide-y divide-blush border-y border-blush">
-        {lines.map((line) => (
-          <div key={line.productId} className="flex items-center justify-between gap-4 py-4">
-            <div>
-              <p className="text-espresso">{line.name}</p>
-              <p className="text-sm text-taupe">{nairaFromKobo(line.priceKobo)} each</p>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <input
-                type="number"
-                min={1}
-                max={line.stock}
-                value={line.quantity}
-                onChange={(e) => setQuantity(line.productId, Number(e.target.value))}
-                className="w-16 rounded-full border border-espresso/15 bg-ivory px-3 py-1 text-center text-sm"
-              />
-              <button
-                type="button"
-                onClick={() => removeItem(line.productId)}
-                className="text-sm text-taupe hover:text-espresso"
-              >
-                Remove
-              </button>
-            </div>
-          </div>
-        ))}
+    <div className="mx-auto max-w-4xl px-6 py-14">
+      <div className="flex items-center justify-between border-b border-blush pb-6">
+        <h1 className="font-display text-3xl md:text-4xl italic text-espresso">Shopping Bag</h1>
+        <Link to="/#shop" className="text-xs uppercase tracking-wider font-medium text-clay-dark underline">
+          Continue shopping
+        </Link>
       </div>
 
-      <p className="mt-6 text-right font-display text-xl italic text-espresso">
-        Total: {nairaFromKobo(totalKobo())}
-      </p>
+      <div className="mt-8 grid gap-12 lg:grid-cols-12">
+        {/* Cart items list */}
+        <div className="lg:col-span-7 divide-y divide-blush">
+          {lines.map((line) => {
+            const itemKey = line.variantId || line.productId;
+            const unitPrice =
+              typeof line.price === "number"
+                ? line.price
+                : line.priceKobo
+                ? line.priceKobo / 100
+                : 0;
+            const lineTotal = unitPrice * line.quantity;
 
-      <form onSubmit={handleSubmit} className="mt-10 grid gap-5">
-        <label className="grid gap-1.5 text-sm text-taupe">
-          Full name
-          <input
-            required
-            value={form.customerName}
-            onChange={(e) => setForm({ ...form, customerName: e.target.value })}
-            className="rounded-xl border border-espresso/15 bg-ivory px-4 py-2.5 text-espresso"
-          />
-        </label>
+            return (
+              <div key={itemKey} className="flex gap-4 py-6">
+                {/* Thumbnail */}
+                <div className="aspect-square w-20 h-20 shrink-0 overflow-hidden rounded-2xl bg-blush">
+                  {line.imageUrl ? (
+                    <img src={line.imageUrl} alt={line.name} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center font-display text-xs italic text-taupe">
+                      {line.name}
+                    </div>
+                  )}
+                </div>
 
-        <label className="grid gap-1.5 text-sm text-taupe">
-          Email
-          <input
-            required
-            type="email"
-            value={form.customerEmail}
-            onChange={(e) => setForm({ ...form, customerEmail: e.target.value })}
-            className="rounded-xl border border-espresso/15 bg-ivory px-4 py-2.5 text-espresso"
-          />
-        </label>
+                {/* Details */}
+                <div className="flex flex-1 flex-col justify-between">
+                  <div>
+                    <div className="flex justify-between items-start">
+                      <h3 className="font-display text-base font-medium text-espresso">{line.name}</h3>
+                      <button
+                        type="button"
+                        onClick={() => removeItem(itemKey)}
+                        className="text-xs text-taupe hover:text-red-600 transition-colors"
+                        aria-label="Remove item"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                    {line.variantTitle && (
+                      <p className="text-xs text-taupe mt-0.5">{line.variantTitle}</p>
+                    )}
+                    <p className="text-xs text-taupe mt-1">
+                      {formatPrice(unitPrice, line.currencyCode || currencyCode())} each
+                    </p>
+                  </div>
 
-        <label className="grid gap-1.5 text-sm text-taupe">
-          Phone (optional)
-          <input
-            value={form.customerPhone}
-            onChange={(e) => setForm({ ...form, customerPhone: e.target.value })}
-            className="rounded-xl border border-espresso/15 bg-ivory px-4 py-2.5 text-espresso"
-          />
-        </label>
+                  {/* Quantity and Line Total */}
+                  <div className="mt-3 flex items-center justify-between">
+                    <div className="flex items-center rounded-full border border-espresso/15 bg-ivory">
+                      <button
+                        type="button"
+                        onClick={() => setQuantity(itemKey, Math.max(1, line.quantity - 1))}
+                        className="px-3 py-1 text-xs text-espresso hover:text-clay"
+                      >
+                        −
+                      </button>
+                      <span className="w-6 text-center text-xs font-medium text-espresso">{line.quantity}</span>
+                      <button
+                        type="button"
+                        onClick={() => setQuantity(itemKey, line.quantity + 1)}
+                        className="px-3 py-1 text-xs text-espresso hover:text-clay"
+                      >
+                        +
+                      </button>
+                    </div>
 
-        <label className="grid gap-1.5 text-sm text-taupe">
-          Shipping address
-          <textarea
-            required
-            rows={3}
-            value={form.shippingAddress}
-            onChange={(e) => setForm({ ...form, shippingAddress: e.target.value })}
-            className="rounded-xl border border-espresso/15 bg-ivory px-4 py-2.5 text-espresso"
-          />
-        </label>
+                    <span className="text-sm font-semibold text-espresso">
+                      {formatPrice(lineTotal, line.currencyCode || currencyCode())}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {/* Order Summary & Shopify Checkout */}
+        <div className="lg:col-span-5">
+          <div className="rounded-3xl border border-blush bg-sand/20 p-6 md:p-8">
+            <h2 className="font-display text-xl italic text-espresso">Order Summary</h2>
 
-        <button
-          type="submit"
-          disabled={submitting}
-          className="mt-2 rounded-full bg-clay px-7 py-3 text-sm font-medium text-ivory transition-colors hover:bg-clay-dark disabled:opacity-60"
-        >
-          {submitting ? "Taking you to payment…" : "Pay with Paystack"}
-        </button>
-      </form>
+            <div className="mt-6 space-y-3 text-sm text-taupe border-b border-blush pb-6">
+              <div className="flex justify-between">
+                <span>Subtotal</span>
+                <span className="font-medium text-espresso">{formattedTotal()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Shipping</span>
+                <span>Calculated at checkout</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Taxes & Duties</span>
+                <span>Calculated at checkout</span>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-between items-baseline font-display text-lg text-espresso">
+              <span>Estimated Total</span>
+              <span className="text-2xl italic font-semibold">{formattedTotal()}</span>
+            </div>
+
+            {error && (
+              <div className="mt-4 rounded-xl bg-red-50 p-3 text-xs text-red-700 border border-red-200">
+                {error}
+              </div>
+            )}
+
+            <button
+              type="button"
+              disabled={submitting}
+              onClick={handleShopifyCheckout}
+              className="mt-6 w-full rounded-full bg-clay py-4 text-sm font-medium text-ivory shadow transition-all hover:bg-clay-dark hover:shadow-md disabled:opacity-60 active:scale-[0.99]"
+            >
+              {submitting ? "Preparing Shopify Checkout…" : "Proceed to Shopify Checkout →"}
+            </button>
+
+            <div className="mt-6 space-y-2 text-center text-xs text-taupe">
+              <p className="flex items-center justify-center gap-1.5 font-medium text-espresso">
+                <span>🔒</span> Powered by Shopify Secure Checkout
+              </p>
+              <p>Supports Credit Cards, Apple Pay, Google Pay, Shop Pay, and localized payment options.</p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

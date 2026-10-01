@@ -1,123 +1,103 @@
-# Touch And GLOW — E-commerce Storefront (React + Express)
+# Touch And GLOW — Headless Shopify Storefront (React + Express)
 
-Two separate projects:
+A headless e-commerce storefront for **Touch And GLOW**, powered by **Shopify Storefront API** (GraphQL) on the frontend (deployed to **Vercel**) and an optional Node/Express backend (deployed to **Render**).
 
-- **`/server`** — Node/Express API, Prisma (Postgres), Paystack integration
-- **`/client`** — React (Vite) frontend, talks to the API over HTTP
+---
 
-This replaces the earlier Next.js version with a plain Express backend, as
-requested — same data model, same security logic (price snapshots, atomic
-stock deduction, idempotent webhook, rate limiting), just split into two
-deployable services instead of one.
+## Architecture Overview
 
-## 1. Set up the server
+- **`/client` (Vercel)**: React 18 + Vite + Tailwind CSS + Zustand.
+  - Fetches live products, images, inventory, and variants directly from Shopify via the **Shopify Storefront API**.
+  - Handles line items and variant selections.
+  - Generates instant Shopify checkout sessions via `cartCreate` GraphQL mutation and redirects customers straight to Shopify's high-converting, 256-bit SSL encrypted checkout.
+  - Supports 1-Click Shop Pay, Apple Pay, Google Pay, Credit/Debit cards, automatic tax calculation, and localized currencies.
+  - Comes with graceful demo fallback and a setup helper if live credentials are not yet entered.
+- **`/server` (Render)**: Node / Express API.
+  - Supports Shopify webhooks (`/api/shopify/webhooks`) with HMAC SHA256 signature verification.
+  - Provides status health-checks (`/api/shopify/status`).
+  - Retains legacy custom order/Paystack endpoints for backward compatibility.
 
-```bash
-cd server
-npm install
-cp .env.example .env
-```
+---
 
-Fill in `.env`:
-- `DATABASE_URL` — a Postgres connection string (free options: Supabase, Neon, Railway)
-- `PAYSTACK_SECRET_KEY` — from https://dashboard.paystack.com (use `sk_test_...` while developing)
-- `CLIENT_URL` — where the frontend runs (`http://localhost:5173` in dev)
+## 1. Shopify Setup Guide
 
-Then set up the database:
+### Step A: Get your Storefront API Access Token
+1. Go to your **Shopify Admin** (`https://admin.shopify.com/store/YOUR-STORE`).
+2. Navigate to **Settings** > **Apps and sales channels** > **Develop apps**.
+3. Click **Allow custom app development** (if prompted), then click **Create an app**.
+4. Name the app (e.g. `Touch And Glow Headless`).
+5. Click **Configure Storefront API scopes** and enable:
+   - `unauthenticated_read_product_listings`
+   - `unauthenticated_read_product_inventory`
+   - `unauthenticated_read_checkouts`
+   - `unauthenticated_write_checkouts`
+   - `unauthenticated_read_customer_tags`
+6. Click **Save**, then click **Install app**.
+7. Under **Storefront API access token**, copy the token (starts with `shpat_...` or similar).
 
-```bash
-npx prisma generate
-npx prisma migrate dev --name init
-npm run prisma:seed
-```
+---
 
-Run it:
+## 2. Deploying to Vercel (`/client`)
 
-```bash
-npm run dev
-```
+In your **Vercel Project Settings** > **Environment Variables**, add:
 
-The API listens on `http://localhost:4000` by default.
+| Variable Name | Example Value | Description |
+|---|---|---|
+| `VITE_SHOPIFY_STORE_DOMAIN` | `your-store-name.myshopify.com` | Your Shopify store domain |
+| `VITE_SHOPIFY_STOREFRONT_ACCESS_TOKEN` | `shpat_xxxxxxxxxxxxxxxxxxxxx` | Your public Storefront API token |
+| `VITE_SHOPIFY_API_VERSION` | `2024-07` | Storefront API version |
+| `VITE_API_URL` | `https://touch-and-glow.onrender.com` | Optional Render backend URL |
 
-## 2. Set up the client
+Trigger a redeploy on Vercel or push your git branch to update.
 
+---
+
+## 3. Deploying to Render (`/server`)
+
+In your **Render Dashboard** > **Environment**, configure:
+
+| Variable Name | Example Value | Description |
+|---|---|---|
+| `PORT` | `4000` | Port for the Express server |
+| `CLIENT_URL` | `https://your-app.vercel.app` | Your Vercel frontend URL (for CORS) |
+| `SHOPIFY_STORE_DOMAIN` | `your-store-name.myshopify.com` | Your Shopify store domain |
+| `SHOPIFY_STOREFRONT_ACCESS_TOKEN` | `shpat_xxxxxxxxxxxxxxxxxxxxx` | Storefront API token |
+| `SHOPIFY_WEBHOOK_SECRET` | `shpss_xxxxxxxxxxxxxxxxxxxx` | Secret for Shopify webhooks (optional) |
+
+If you configure Shopify webhooks, point them in Shopify Admin to:
+`https://your-server.onrender.com/api/shopify/webhooks`
+
+---
+
+## 4. Local Development
+
+### Client (Frontend)
 ```bash
 cd client
-npm install
 cp .env.example .env
-```
-
-`VITE_API_URL` should point at the server (`http://localhost:4000` in dev).
-
-Run it:
-
-```bash
+# Edit .env and enter your VITE_SHOPIFY_STORE_DOMAIN and VITE_SHOPIFY_STOREFRONT_ACCESS_TOKEN
+npm install
 npm run dev
 ```
+Open [http://localhost:5173](http://localhost:5173) in your browser.
 
-The storefront runs on `http://localhost:5173`.
-
-## 3. Paystack webhook setup (required for orders to ever get marked "paid")
-
-Paystack confirms payment by calling your **server** directly, not through
-the browser. In the Paystack dashboard, set your webhook URL to:
-
-```
-https://your-server-domain.com/api/paystack/webhook
-```
-
-**To test locally**, tunnel the server (not the client) with
-[ngrok](https://ngrok.com):
-
+### Server (Backend)
 ```bash
-ngrok http 4000
+cd server
+cp .env.example .env
+npm install
+npm run dev
 ```
+The API runs on [http://localhost:4000](http://localhost:4000).
 
-Use the ngrok HTTPS URL + `/api/paystack/webhook` as the webhook URL while
-testing.
+---
 
-## How a purchase flows through the system
+## How Checkout Flows
 
-1. Client fetches products from `GET /api/products` and holds the cart in
-   Zustand (`localStorage`-persisted — convenience only, never trusted for
-   money).
-2. At checkout, the client sends only `{ customerName, email, items: [{productId, quantity}] }`
-   to `POST /api/orders` on the server — **no prices are sent from the browser.**
-3. The server looks up each product's current price/stock, snapshots the
-   price per line item, creates the order as `pending`, and calls
-   Paystack's Initialize Transaction API.
-4. The client is redirected to Paystack's hosted checkout.
-5. After payment, Paystack sends a `charge.success` webhook to
-   `POST /api/paystack/webhook`. The handler:
-   - Verifies the HMAC SHA512 signature against the raw request body
-     (mounted with `express.raw()`, not `express.json()`, specifically so
-     the bytes used for verification are untouched).
-   - Re-verifies the transaction directly via Paystack's Verify API.
-   - Skips reprocessing if the order is already `successful` (Paystack can
-     redeliver the same webhook event more than once).
-   - Atomically decrements stock inside a Prisma transaction using a
-     conditional `WHERE stock >= quantity` update, so concurrent purchases
-     can never oversell.
-   - Marks the order `successful`.
-6. The client's order-success page polls `GET /api/orders/:reference`
-   until the status flips, then clears the cart.
-
-## Why two projects instead of one
-
-- Deploy independently (e.g. client on Vercel/Netlify as a static site,
-  server on Render/Railway/Fly.io or a VPS)
-- No framework coupling — swap the frontend later without touching the API
-- Matches a conventional React + Express/FastAPI split if that's the
-  mental model you want to work in
-
-## Production checklist before going live
-
-- [ ] Switch Paystack keys to live keys
-- [ ] Set `CLIENT_URL` (server) and `VITE_API_URL` (client) to real domains
-- [ ] Add `helmet` and stricter CORS config on the server for production
-- [ ] Swap the in-memory rate limiter for a shared store (Redis/Upstash) if
-      you run more than one server instance
-- [ ] Add real product photography (currently placeholder blocks)
-- [ ] Add order confirmation emails (not included — wire up Resend,
-      Postmark, etc. in the webhook handler after marking an order successful)
-- [ ] Add an admin view for managing products/orders (not included)
+1. The customer selects a product and chooses their desired variant (e.g. 30ml, 50ml, shade).
+2. The item is saved to the shopping bag with its Shopify `variantId`.
+3. In the shopping bag (`/checkout`), the customer clicks **Proceed to Shopify Checkout** (or clicks **Buy with Shopify** directly from the product page).
+4. The client executes the `cartCreate` mutation against the Shopify Storefront API.
+5. Shopify returns the secure `checkoutUrl`.
+6. The user is redirected to Shopify's checkout to complete shipping, taxes, and payment via Shop Pay, credit card, Apple Pay, etc.
+7. Upon order placement, Shopify notifies the customer via email and redirects to the confirmation page.

@@ -7,16 +7,17 @@ type OrderStatus = "pending" | "successful" | "failed";
 
 export default function OrderSuccessPage() {
   const [searchParams] = useSearchParams();
-  const reference = searchParams.get("reference");
+  const reference = searchParams.get("reference") || searchParams.get("checkout_token");
   const clear = useCartStore((s) => s.clear);
-  const [status, setStatus] = useState<OrderStatus>("pending");
+  const [status, setStatus] = useState<OrderStatus>("successful");
 
   useEffect(() => {
-    if (!reference) return;
+    // Clear cart immediately upon reaching order success
+    clear();
 
-    // The Paystack webhook confirms payment asynchronously, usually within
-    // a second or two of landing here — so we poll briefly rather than
-    // assuming success just because the customer was redirected back.
+    if (!reference || !reference.startsWith("tag-")) return;
+
+    // Optional legacy Paystack polling if coming from older flow
     let cancelled = false;
     let attempts = 0;
 
@@ -27,12 +28,8 @@ export default function OrderSuccessPage() {
       try {
         const data = await apiFetch<{ order: { status: OrderStatus } }>(`/api/orders/${reference}`);
         if (!cancelled) setStatus(data.order.status);
-        if (data.order.status === "successful") {
-          clear();
-          return;
-        }
       } catch {
-        // order not found yet or transient error — keep polling
+        // Ignored
       }
       if (!cancelled) setTimeout(poll, 2000);
     }
@@ -44,30 +41,30 @@ export default function OrderSuccessPage() {
   }, [reference, clear]);
 
   return (
-    <div className="mx-auto max-w-xl px-6 py-24 text-center">
-      {status === "successful" && (
-        <>
-          <h1 className="font-display text-3xl italic text-espresso">Order confirmed</h1>
-          <p className="mt-4 text-taupe">
-            Thank you — a confirmation is on its way to your email. We'll start packing it up.
-          </p>
-        </>
+    <div className="mx-auto max-w-xl px-6 py-28 text-center">
+      <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-2xl text-emerald-600">
+        ✓
+      </div>
+
+      <h1 className="font-display text-4xl italic text-espresso">Order Confirmed!</h1>
+      <p className="mt-4 text-base text-taupe leading-relaxed">
+        Thank you for shopping with Touch And GLOW. Your order has been placed and a detailed confirmation with tracking information has been sent to your email.
+      </p>
+
+      {reference && (
+        <p className="mt-4 font-mono text-xs text-taupe/80">
+          Order Reference: <span className="text-espresso font-medium">{reference}</span>
+        </p>
       )}
-      {status === "pending" && (
-        <>
-          <h1 className="font-display text-3xl italic text-espresso">Confirming your payment…</h1>
-          <p className="mt-4 text-taupe">This usually takes a few seconds.</p>
-        </>
-      )}
-      {status === "failed" && (
-        <>
-          <h1 className="font-display text-3xl italic text-espresso">Payment didn't go through</h1>
-          <p className="mt-4 text-taupe">No charge was completed. You can try again from your cart.</p>
-        </>
-      )}
-      <Link to="/#shop" className="mt-8 inline-block text-sm text-clay-dark underline">
-        Back to the collection
-      </Link>
+
+      <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+        <Link
+          to="/#shop"
+          className="rounded-full bg-clay px-8 py-3.5 text-sm font-medium text-ivory transition-colors hover:bg-clay-dark"
+        >
+          Back to the collection
+        </Link>
+      </div>
     </div>
   );
 }
