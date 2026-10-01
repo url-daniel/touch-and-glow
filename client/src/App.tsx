@@ -1,6 +1,9 @@
 import { Routes, Route } from "react-router-dom";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import CartDrawer from "@/components/CartDrawer";
+import QuickViewModal from "@/components/QuickViewModal";
+import Toast from "@/components/Toast";
 import ShopifySetupNotice from "@/components/ShopifySetupNotice";
 import HomePage from "@/pages/HomePage";
 import ProductPage from "@/pages/ProductPage";
@@ -9,7 +12,7 @@ import OrderSuccessPage from "@/pages/OrderSuccessPage";
 
 export default function App() {
   return (
-    <div className="min-h-screen flex flex-col bg-ivory text-espresso">
+    <div className="min-h-screen flex flex-col bg-cream text-espresso">
       <ShopifySetupNotice />
       <Header />
       <main className="flex-1">
@@ -21,6 +24,11 @@ export default function App() {
         </Routes>
       </main>
       <Footer />
+
+      {/* Global interactive overlays */}
+      <CartDrawer />
+      <QuickViewModal />
+      <Toast />
     </div>
   );
 }

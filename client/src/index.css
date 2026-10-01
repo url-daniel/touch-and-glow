@@ -3,14 +3,21 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
-    @apply bg-cream text-espresso font-body antialiased;
+    @apply bg-cream text-espresso font-body antialiased selection:bg-clay/20 selection:text-espresso;
   }
 
   h1,
   h2,
-  h3 {
-    @apply font-display text-espresso;
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-display text-espresso tracking-tight;
   }
 
   :focus-visible {
@@ -24,4 +31,57 @@
       transition-duration: 0.001ms !important;
     }
   }
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  display: flex;
+  width: 200%;
+  animation: marquee 35s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+/* Glassmorphism helpers */
+.glass-panel {
+  background: rgba(255, 253, 251, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(240, 217, 206, 0.6);
+}
+
+.glass-pill {
+  background: rgba(255, 253, 251, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(240, 217, 206, 0.4);
+}
+
+/* Custom subtle scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #FBF5EF;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #E8D3C8;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #C98F76;
 }
