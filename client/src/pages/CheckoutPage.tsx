@@ -9,6 +9,17 @@ export default function CheckoutPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const hasDemoItems = lines.some((l) => l.variantId?.includes("tag-demo"));
+
+  function handleClearDemoItems() {
+    lines.forEach((l) => {
+      if (l.variantId?.includes("tag-demo") || l.productId?.includes("tag-demo")) {
+        removeItem(l.variantId || l.productId);
+      }
+    });
+    setError(null);
+  }
+
   async function handleShopifyCheckout() {
     setError(null);
     setSubmitting(true);
@@ -59,6 +70,21 @@ export default function CheckoutPage() {
           Continue shopping
         </Link>
       </div>
+
+      {hasDemoItems && (
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900">
+          <div>
+            <strong>Preview Demo Items in Bag:</strong> You have sample products in your cart from before connecting your live Shopify store. Clear demo items to check out with your live Shopify store.
+          </div>
+          <button
+            type="button"
+            onClick={handleClearDemoItems}
+            className="rounded-full bg-amber-800 px-4 py-1.5 font-medium text-amber-50 hover:bg-amber-900 transition-colors shadow-sm"
+          >
+            Clear Demo Items
+          </button>
+        </div>
+      )}
 
       <div className="mt-8 grid gap-12 lg:grid-cols-12">
         {/* Cart items list */}

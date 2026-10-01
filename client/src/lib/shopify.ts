@@ -467,6 +467,16 @@ export async function createShopifyCheckout(
     );
   }
 
+  // Check if any items in the cart are placeholder demo products
+  const demoItems = lines.filter(
+    (l) => l.variantId.includes("tag-demo") || !l.variantId.startsWith("gid://shopify/ProductVariant/")
+  );
+  if (demoItems.length > 0) {
+    throw new Error(
+      "Your shopping bag contains sample/demo products from preview mode. Please remove demo products and add items from your live Shopify catalog to proceed."
+    );
+  }
+
   const formattedLines = lines.map((line) => ({
     merchandiseId: line.variantId,
     quantity: line.quantity
