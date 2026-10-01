@@ -5,7 +5,6 @@ import SkincareRitual from "@/components/SkincareRitual";
 import IngredientsSection from "@/components/IngredientsSection";
 import ReviewsSection from "@/components/ReviewsSection";
 import FAQSection from "@/components/FAQSection";
-import NewsletterSection from "@/components/NewsletterSection";
 
 export default function HomePage() {
   return (
@@ -17,7 +16,6 @@ export default function HomePage() {
       <IngredientsSection />
       <ReviewsSection />
       <FAQSection />
-      <NewsletterSection />
     </>
   );
 }

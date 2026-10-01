@@ -12,18 +12,22 @@ export default function Header() {
 
   return (
     <>
-      {/* Top Announcement Bar */}
-      <div className="bg-espresso text-ivory text-[11px] py-2 px-4 text-center tracking-wider font-medium">
-        <span>✨ COMPLIMENTARY EXPRESS SHIPPING ON ORDERS OVER $100 • USE CODE </span>
-        <strong className="text-peach underline font-semibold">GLOW15</strong>
-        <span> FOR 15% OFF</span>
-      </div>
-
-      <header className="sticky top-0 z-40 bg-cream/90 backdrop-blur-md border-b border-blush/60 transition-colors">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4 md:py-5">
-          {/* Logo */}
-          <Link to="/" className="font-display text-2xl md:text-3xl italic text-espresso tracking-tight hover:opacity-90 transition-opacity">
-            Touch And GLOW
+      <header className="sticky top-0 z-40 bg-cream/95 backdrop-blur-md border-b border-blush/60 transition-colors">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3.5 md:py-4">
+          {/* Enhanced Luxury Logo Lockup */}
+          <Link to="/" className="group flex items-center gap-3 tracking-tight">
+            <span className="relative flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-tr from-clay via-clay to-peach text-ivory shadow-sm transition-all duration-300 group-hover:scale-105 group-hover:shadow-md">
+              <span className="font-display italic font-semibold text-base tracking-tighter">TG</span>
+              <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-peach border-2 border-ivory" />
+            </span>
+            <div className="flex flex-col">
+              <span className="font-display text-2xl md:text-3xl italic leading-none text-espresso tracking-tight transition-colors group-hover:text-clay-dark">
+                Touch <span className="font-normal not-italic text-clay text-xl md:text-2xl font-display">&</span> GLOW
+              </span>
+              <span className="text-[9px] uppercase tracking-[0.28em] font-semibold text-taupe/80 mt-0.5">
+                Botanical Atelier
+              </span>
+            </div>
           </Link>
 
           {/* Desktop Nav */}

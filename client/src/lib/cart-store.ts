@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { CartLine, Product } from "@/types";
 import { formatPrice } from "@/types";
+import { fireCartConfetti } from "@/lib/confetti";
 
 type CartState = {
   lines: CartLine[];
@@ -77,6 +78,13 @@ export const useCartStore = create<CartState>()(
             toastMessage: `Added "${line.name}" to your bag`
           };
         });
+
+        // Trigger celebratory luxury confetti burst
+        try {
+          fireCartConfetti();
+        } catch {
+          // Graceful fallback
+        }
 
         // Auto-dismiss toast
         setTimeout(() => {
