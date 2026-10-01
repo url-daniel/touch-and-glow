@@ -233,7 +233,6 @@ const PRODUCTS_QUERY = `
                 id
                 title
                 availableForSale
-                quantityAvailable
                 price {
                   amount
                   currencyCode
@@ -282,7 +281,6 @@ const PRODUCT_BY_HANDLE_QUERY = `
             id
             title
             availableForSale
-            quantityAvailable
             price {
               amount
               currencyCode
@@ -348,7 +346,6 @@ interface RawShopifyProductNode {
         id: string;
         title: string;
         availableForSale: boolean;
-        quantityAvailable?: number | null;
         price: {
           amount: string;
           currencyCode: string;
@@ -372,12 +369,11 @@ function transformShopifyProduct(node: RawShopifyProductNode): Product {
     id: e.node.id,
     title: e.node.title,
     availableForSale: e.node.availableForSale,
-    quantityAvailable: e.node.quantityAvailable,
     price: e.node.price,
     selectedOptions: e.node.selectedOptions
   }));
 
-  const defaultVariant = variants[0];
+  const defaultVariant = variants.find((v) => v.availableForSale) || variants[0];
   const priceAmount = defaultVariant
     ? parseFloat(defaultVariant.price.amount)
     : parseFloat(node.priceRange.minVariantPrice.amount);
@@ -385,11 +381,7 @@ function transformShopifyProduct(node: RawShopifyProductNode): Product {
     ? defaultVariant.price.currencyCode
     : node.priceRange.minVariantPrice.currencyCode;
 
-  // Approximate stock ceiling from Shopify variants
-  const totalStock = variants.reduce(
-    (sum, v) => sum + (v.quantityAvailable !== null && v.quantityAvailable !== undefined ? Math.max(0, v.quantityAvailable) : (v.availableForSale ? 10 : 0)),
-    0
-  );
+  const isProductAvailable = variants.some((v) => v.availableForSale) || node.availableForSale;
 
   return {
     id: node.id,
@@ -402,8 +394,8 @@ function transformShopifyProduct(node: RawShopifyProductNode): Product {
     currencyCode: currency,
     imageUrl,
     images: images.length > 0 ? images : [imageUrl],
-    stock: totalStock > 0 ? totalStock : (node.availableForSale ? 10 : 0),
-    availableForSale: node.availableForSale,
+    stock: isProductAvailable ? 99 : 0,
+    availableForSale: isProductAvailable,
     variants,
     defaultVariantId: defaultVariant ? defaultVariant.id : node.id,
     priceKobo: Math.round(priceAmount * 100)

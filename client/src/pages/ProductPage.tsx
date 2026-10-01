@@ -213,7 +213,7 @@ export default function ProductPage() {
             priceFormatted={formattedCurrentPrice}
             currencyCode={currentCurrency}
             imageUrl={activeImage || product.imageUrl}
-            stock={selectedVariant?.quantityAvailable ?? product.stock}
+            stock={isAvailable ? 99 : 0}
             availableForSale={isAvailable}
             showBuyNow={true}
           />

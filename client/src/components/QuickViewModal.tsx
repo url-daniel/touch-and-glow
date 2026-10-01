@@ -139,7 +139,7 @@ export default function QuickViewModal() {
                   priceFormatted={formattedPrice}
                   currencyCode={currentCurrency}
                   imageUrl={activeImage || quickViewProduct.imageUrl}
-                  stock={selectedVariant?.quantityAvailable ?? quickViewProduct.stock}
+                  stock={isAvailable ? 99 : 0}
                   availableForSale={isAvailable}
                   showBuyNow={true}
                 />
