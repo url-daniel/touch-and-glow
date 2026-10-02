@@ -3,7 +3,10 @@ import { formatPrice } from "@/types";
 
 const RAW_DOMAIN = import.meta.env.VITE_SHOPIFY_STORE_DOMAIN || "";
 const STOREFRONT_ACCESS_TOKEN = import.meta.env.VITE_SHOPIFY_STOREFRONT_ACCESS_TOKEN || "";
-const API_VERSION = import.meta.env.VITE_SHOPIFY_API_VERSION || "2024-07";
+const RAW_VERSION = (import.meta.env.VITE_SHOPIFY_API_VERSION || "2024-07").trim();
+// Supported stable Shopify Storefront API quarterly versions
+const VALID_VERSIONS = ["2024-01", "2024-04", "2024-07", "2024-10", "2025-01"];
+const API_VERSION = VALID_VERSIONS.includes(RAW_VERSION) ? RAW_VERSION : "2024-07";
 
 function normalizeShopifyDomain(raw: string): string {
   if (!raw) return "";
